@@ -1,0 +1,15 @@
+[package]
+name = "cmsis-dsp-api"
+version = "0.1.0"
+authors = ["David O'Connor <david.alan.oconnor@gmail.com>"]
+edition = "2018"
+resolver = "2"  # remove when switching to 2021 edition
+
+[dependencies]
+# CMSIS-DSP, for FFTs, FIR etc. C lib wrapped with FFI.
+# Trouble with LIBCLANG. See this: https://github.com/rust-lang/rust-bindgen/blob/master/book/src/requirements.md
+#cmsis-dsp-sys = "0.3.1"
+cmsis-dsp-sys = { git = "https://github.com/jacobrosenthal/cmsis-dsp-sys", branch = "master" }
+
+# We may need a math lib like libm later. See note on cmsis-dsp-sys readme.
+# libm = "0.2.1"
