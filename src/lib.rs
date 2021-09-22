@@ -13,9 +13,70 @@
 //! Only wraps functions that map to C pointers; these are the ones that need an API improvement.
 //! For ones that don't (Eg arm_sin_), use the wrapped CMSIS library directly.
 
-use core::mem::MaybeUninit;
+// Attempt to avoid double-initialization of C structs; not working
+// use core::mem::MaybeUninit;
 
-use cmsis_dsp_sys::{arm_fir_f32, arm_fir_init_f32, arm_fir_instance_f32};
+use cmsis_dsp_sys::{
+    arm_fir_f32, 
+    arm_fir_init_f32, 
+    arm_fir_instance_f32,
+    arm_fir_q31,
+    arm_fir_fast_q31, 
+    arm_fir_init_q31, 
+    arm_fir_instance_q31, 
+};
+
+// todo: DOn't forget the fast q31 FIRs.
+
+
+/// Wrapper for CMSIS-DSP function `arm_fir_f32` using Rust types.
+/// [arm_fir_q31 docs](https://www.keil.com/pack/doc/CMSIS/DSP/html/group__FIR.html#ga2f6fc6582ab4491b3ea8c038c5247ecf)
+/// See docs on _f32 variant for more details, including inline code comments.
+// The main difference is we use `u32` instead of `f32`.
+pub fn rust_arm_fir_q31(
+    input: &[i32],
+    output: &mut [i32],
+    filter_coeffs: &[i32],
+    fir_state: &mut [i32],
+    block_size: u32,
+    num_taps: u16,
+) {
+    // todo: Confirm you can drop-in u32 for q31.
+    assert!(
+        input.len() == output.len(),
+        "Input and output array sizes must be the same."
+    );
+
+    let num_blocks = input.len() as u32 / block_size;
+
+    let mut s = arm_fir_instance_q31 {
+        numTaps: num_taps,
+        pCoeffs: filter_coeffs.as_ptr(),
+        pState: fir_state.as_mut_ptr(),
+    };
+
+    unsafe {
+        arm_fir_init_q31(
+            &mut s,
+            num_taps,
+            filter_coeffs.as_ptr(),
+            fir_state.as_mut_ptr(),
+            block_size,
+        );
+    }
+
+    for i in 0..num_blocks {
+        unsafe {
+            arm_fir_q31(
+                &mut s,
+                input[i as usize * block_size as usize..].as_ptr(),
+                output[i as usize * block_size as usize..].as_mut_ptr(),
+                block_size,
+            );
+        }
+    }
+}
+
 
 /// Wrapper for CMSIS-DSP function `arm_fir_f32` using Rust types.
 /// [arm_fir_f32 docs](https://www.keil.com/pack/doc/CMSIS/DSP/html/group__FIR.html#ga0cf008f650a75f5e2cf82d10691b64d9)
@@ -74,7 +135,7 @@ pub fn rust_arm_fir_f32(
     unsafe {
         arm_fir_init_f32(
             &mut s,
-            num_taps, // as uint16_t? using cty lib
+            num_taps,
             filter_coeffs.as_ptr(),
             fir_state.as_mut_ptr(),
             block_size,
