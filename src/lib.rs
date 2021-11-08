@@ -16,15 +16,7 @@
 // Attempt to avoid double-initialization of C structs; not working
 // use core::mem::MaybeUninit;
 
-use cmsis_dsp_sys::{
-    arm_fir_f32, 
-    arm_fir_init_f32, 
-    arm_fir_instance_f32,
-    arm_fir_q31,
-    arm_fir_fast_q31, 
-    arm_fir_init_q31, 
-    arm_fir_instance_q31, 
-};
+use cmsis_dsp_sys as sys;
 
 // todo: DOn't forget the fast q31 FIRs.
 
@@ -32,31 +24,31 @@ use cmsis_dsp_sys::{
 /// Wrapper for CMSIS-DSP function `arm_fir_f32` using Rust types.
 /// [arm_fir_q31 docs](https://www.keil.com/pack/doc/CMSIS/DSP/html/group__FIR.html#ga2f6fc6582ab4491b3ea8c038c5247ecf)
 /// See docs on _f32 variant for more details, including inline code comments.
-// The main difference is we use `u32` instead of `f32`.
-pub fn rust_arm_fir_q31(
+// The main difference is we use `i32` instead of `f32`.
+pub fn fir_q31(
     input: &[i32],
     output: &mut [i32],
     filter_coeffs: &[i32],
     fir_state: &mut [i32],
     block_size: u32,
-    num_taps: u16,
+    // num_taps: u16,
 ) {
-    // todo: Confirm you can drop-in u32 for q31.
-    assert!(
-        input.len() == output.len(),
-        "Input and output array sizes must be the same."
-    );
+    // assert!(
+    //     input.len() == output.len(),
+    //     "Input and output array sizes must be the same."
+    // );
 
     let num_blocks = input.len() as u32 / block_size;
+    let num_taps = filter_coeffs.len() as u16;
 
-    let mut s = arm_fir_instance_q31 {
+    let mut s = sys::arm_fir_instance_q31 {
         numTaps: num_taps,
         pCoeffs: filter_coeffs.as_ptr(),
         pState: fir_state.as_mut_ptr(),
     };
 
     unsafe {
-        arm_fir_init_q31(
+        sys::arm_fir_init_q31(
             &mut s,
             num_taps,
             filter_coeffs.as_ptr(),
@@ -67,7 +59,7 @@ pub fn rust_arm_fir_q31(
 
     for i in 0..num_blocks {
         unsafe {
-            arm_fir_q31(
+            sys::arm_fir_q31(
                 &mut s,
                 input[i as usize * block_size as usize..].as_ptr(),
                 output[i as usize * block_size as usize..].as_mut_ptr(),
@@ -77,28 +69,20 @@ pub fn rust_arm_fir_q31(
     }
 }
 
+// todo: Apply your API changes below to fixed point versions.
 
-/// Wrapper for CMSIS-DSP function `arm_fir_f32` using Rust types.
-/// [arm_fir_f32 docs](https://www.keil.com/pack/doc/CMSIS/DSP/html/group__FIR.html#ga0cf008f650a75f5e2cf82d10691b64d9)
-/// See https://www.keil.com/pack/doc/CMSIS/DSP/html/group__FIRLPF.html
-/// and https://www.keil.com/pack/doc/CMSIS/DSP/html/arm_fir_example_f32_8c-example.html
-/// For example on on this code structure.
-///
-/// Coefficients can be generated using fir1() MATLAB function. eg fir1(28, 6/24)
-pub fn rust_arm_fir_f32(
-    input: &[f32],
-    output: &mut [f32],
+/// Wrapper for CMSIS-DSP function `arm_fir_init_f32`.
+fn fir_init_f32(
+    s: &mut sys::arm_fir_instance_f32,
     filter_coeffs: &[f32],
-    fir_state: &mut [f32],
+    state: &mut [f32],
     block_size: u32,
-    num_taps: u16,
 ) {
-    assert!(
-        input.len() == output.len(),
-        "Input and output array sizes must be the same."
-    );
 
-    let num_blocks = input.len() as u32 / block_size;
+    let num_taps = filter_coeffs.len();
+    // pState points to the array of state variables. pState is of length numTaps+blockSize-1 samples
+    // where blockSize is the number of input samples processed by each call to arm_fir_f32().
+    assert!(state.len() == num_taps + block_size as usize - 1);
 
     // https://www.keil.com/pack/doc/CMSIS/DSP/html/structarm__fir__instance__f32.html
     // Data Fields:
@@ -108,11 +92,11 @@ pub fn rust_arm_fir_f32(
     // `MaybeUnit` skips zeroizing, which is required by the C API.
     // let mut s = MaybeUninit::uninit();
 
-    let mut s = arm_fir_instance_f32 {
-        numTaps: num_taps,
-        pCoeffs: filter_coeffs.as_ptr(),
-        pState: fir_state.as_mut_ptr(),
-    };
+    // let mut s = sys::arm_fir_instance_f32 {
+    //     numTaps: num_taps,
+    //     pCoeffs: filter_coeffs.as_ptr(),
+    //     pState: fir_state.as_mut_ptr(),
+    // };
 
     // Note: We end up initializing both above, and then again in `arm_fir_init_f32`,
     // which is perhaps a duplicate.
@@ -133,16 +117,33 @@ pub fn rust_arm_fir_f32(
     // [in]	blockSize	number of samples processed per call
     // Returns none
     unsafe {
-        arm_fir_init_f32(
-            &mut s,
-            num_taps,
+        sys::arm_fir_init_f32(
+            s,
+            num_taps as u16,
             filter_coeffs.as_ptr(),
-            fir_state.as_mut_ptr(),
+            state.as_mut_ptr(),
             block_size,
         );
     }
+}
 
+
+/// Wrapper for CMSIS-DSP function `arm_fir_f32` using Rust types.
+/// [arm_fir_f32 docs](https://www.keil.com/pack/doc/CMSIS/DSP/html/group__FIR.html#ga0cf008f650a75f5e2cf82d10691b64d9)
+/// See https://www.keil.com/pack/doc/CMSIS/DSP/html/group__FIRLPF.html
+/// and https://www.keil.com/pack/doc/CMSIS/DSP/html/arm_fir_example_f32_8c-example.html
+/// For example on on this code structure.
+///
+/// Coefficients can be generated using fir1() MATLAB function. eg fir1(28, 6/24)
+pub fn fir_f32(
+    s: &mut sys::arm_fir_instance_f32,
+    input: &[f32],
+    output: &mut [f32],
+    block_size: u32,
+) {
     // Call the FIR process function for every blockSize samples
+    let num_blocks = input.len() as u32 / block_size;
+
     for i in 0..num_blocks {
         // void arm_fir_f32 	(
         //     const arm_fir_instance_f32 *  	S,
@@ -157,8 +158,131 @@ pub fn rust_arm_fir_f32(
         // [in]	blockSize	number of samples to process
         // Returns none
         unsafe {
-            arm_fir_f32(
-                &mut s,
+            sys::arm_fir_f32(
+                s,
+                input[i as usize * block_size as usize..].as_ptr(),
+                output[i as usize * block_size as usize..].as_mut_ptr(),
+                block_size,
+            );
+        }
+    }
+}
+
+/// Wrapper for CMSIS-DSP function `arm_biquad_cascade_df1_init_f32`.
+pub fn biquad_cascade_df1_init_f32(s: &mut sys::arm_biquad_casd_df1_inst_f32, filter_coeffs: &[f32], state: &mut [f32]) {
+    let num_stages = filter_coeffs.len() / 5;
+
+    // The 4 state variables for stage 1 are first, then the 4 state variables for stage 2, and so on.
+    // The state array has a total length of 4*numStages values.
+    assert!(state.len() == 4 * num_stages);
+
+    // let mut s = sys::arm_biquad_casd_df1_inst_f32 {
+    //     numStages: num_stages,
+    //     pCoeffs: filter_coeffs.as_ptr(),
+    //     pState: state.as_mut_ptr(),
+    // };
+
+    //     The coefficients are stored in the array pCoeffs in the following order:
+    //
+    //         {b10, b11, b12, a11, a12, b20, b21, b22, a21, a22, ...}
+    //
+    //     where b1x and a1x are the coefficients for the first stage, b2x and a2x are the coefficients
+    // for the second stage, and so on. The pCoeffs array contains a total of 5*numStages values.
+    //
+    //     The pState is a pointer to state array. Each Biquad stage has 4 state variables x[n-1], x[n-2],
+    // y[n-1], and y[n-2]. The state variables are arranged in the pState array as:
+    //
+    //         {x[n-1], x[n-2], y[n-1], y[n-2]}
+    //
+    //     The 4 state variables for stage 1 are first, then the 4 state variables for stage 2, and so on.
+    // The state array has a total length of 4*numStages values. The state variables are updated after
+    // each block of data is processed; the coefficients are untouched.
+
+    unsafe {
+        sys::arm_biquad_cascade_df1_init_f32(
+            s,
+            num_stages as u8,
+            filter_coeffs.as_ptr(),
+            state.as_mut_ptr(),
+        );
+    }
+}
+
+/// Wrapper for CMSIS-DSP function `arm_biquad_cascade_df1_f32`.
+pub fn biquad_cascade_df1_f32(
+    s: &mut sys::arm_biquad_casd_df1_inst_f32,
+    input: &[f32],
+    output: &mut [f32],
+    block_size: u32,
+) {
+    let num_blocks = input.len() as u32 / block_size;
+
+    for i in 0..num_blocks {
+        unsafe {
+            sys::arm_biquad_cascade_df1_f32(
+                s,
+                input[i as usize * block_size as usize..].as_ptr(),
+                output[i as usize * block_size as usize..].as_mut_ptr(),
+                block_size,
+            );
+        }
+    }
+}
+
+/// Wrapper for CMSIS-DSP function `arm_biquad_cascade_df2T_init_f32`.
+pub fn biquad_cascade_df2T_init_f32(s: &mut sys::arm_biquad_cascade_df2T_instance_f32, filter_coeffs: &[f32], state: &mut [f32]) {
+    let num_stages = filter_coeffs.len() / 5;
+
+    // The 4 state variables for stage 1 are first, then the 4 state variables for stage 2, and so on.
+    // The state array has a total length of 4*numStages values.
+    assert!(state.len() == 4 * num_stages);
+
+    // let mut s = sys::arm_biquad_casd_df2T_inst_f32 {
+    //     numStages: num_stages,
+    //     pCoeffs: filter_coeffs.as_ptr(),
+    //     pState: state.as_mut_ptr(),
+    // };
+
+    //     The coefficients are stored in the array pCoeffs in the following order:
+    //
+    //         {b10, b11, b12, a11, a12, b20, b21, b22, a21, a22, ...}
+    //
+    //     where b1x and a1x are the coefficients for the first stage, b2x and a2x are the coefficients
+    // for the second stage, and so on. The pCoeffs array contains a total of 5*numStages values.
+    //
+    //     The pState is a pointer to state array. Each Biquad stage has 4 state variables x[n-1], x[n-2],
+    // y[n-1], and y[n-2]. The state variables are arranged in the pState array as:
+    //
+    //         {x[n-1], x[n-2], y[n-1], y[n-2]}
+    //
+    //     The 4 state variables for stage 1 are first, then the 4 state variables for stage 2, and so on.
+    // The state array has a total length of 4*numStages values. The state variables are updated after
+    // each block of data is processed; the coefficients are untouched.
+
+    unsafe {
+        sys::arm_biquad_cascade_df2T_init_f32(
+            s,
+            num_stages as u8,
+            filter_coeffs.as_ptr(),
+            state.as_mut_ptr(),
+        );
+    }
+}
+
+/// Wrapper for CMSIS-DSP function `arm_biquad_cascade_df2T_f32`.
+pub fn biquad_cascade_df2T_f32(
+    s: &mut sys::arm_biquad_cascade_df2T_instance_f32,
+    input: &[f32],
+    output: &mut [f32],
+    block_size: u32,
+) {
+    let num_blocks = input.len() as u32 / block_size;
+    // let num_stages = filter_coeffs.len() as u32 / 5;
+
+    for i in 0..num_blocks {
+        unsafe {
+            sys::arm_biquad_cascade_df2T_f32(
+                s,
                 input[i as usize * block_size as usize..].as_ptr(),
                 output[i as usize * block_size as usize..].as_mut_ptr(),
                 block_size,
