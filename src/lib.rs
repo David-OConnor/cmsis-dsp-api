@@ -95,12 +95,7 @@ pub fn fir_q31(
 
     compiler_fence(Ordering::SeqCst);
     unsafe {
-        sys::arm_fir_q31(
-            s,
-            input.as_ptr(),
-            output.as_mut_ptr(),
-            block_size,
-        );
+        sys::arm_fir_q31(s, input.as_ptr(), output.as_mut_ptr(), block_size);
     }
 }
 
@@ -177,12 +172,68 @@ pub fn fir_f32(
     // Returns none
     compiler_fence(Ordering::SeqCst);
     unsafe {
-        sys::arm_fir_f32(
+        sys::arm_fir_f32(s, input.as_ptr(), output.as_mut_ptr(), block_size);
+    }
+}
+
+/// Wrapper for CMSIS-DSP function `arm_fir_decimate_init_f32`.
+pub fn fir_decimate_init_f32(
+    s: &mut sys::arm_fir_decimate_instance_f32,
+    decimation_factor: u8,
+    filter_coeffs: &[f32],
+    state: &mut [f32],
+    block_size: u32,
+) {
+    let num_taps = filter_coeffs.len();
+    // pState points to the array of state variables. pState is of length numTaps+blockSize-1 samples
+    // where blockSize is the number of input samples processed by each call to arm_fir_f32().
+    assert_eq!(state.len(), num_taps + block_size as usize - 1);
+
+    // https://www.keil.com/pack/doc/CMSIS/DSP/html/group__FIR__decimate.html#ga67c80582fc296552fef2bd1f208d853b
+    // Parameters:
+    // [in,out]	S	points to an instance of the floating-point FIR decimator structure
+    // [in]	numTaps	number of coefficients in the filter
+    // [in]	M	decimation factor
+    // [in]	pCoeffs	points to the filter coefficients
+    // [in]	pState	points to the state buffer
+    // [in]	blockSize	number of input samples to process per call
+
+    // https://www.keil.com/pack/doc/CMSIS/DSP/html/arm__fir__decimate__init__f32_8c.html
+    compiler_fence(Ordering::SeqCst);
+    unsafe {
+        sys::arm_fir_decimate_init_f32(
             s,
-            input.as_ptr(),
-            output.as_mut_ptr(),
+            num_taps as u16,
+            decimation_factor,
+            filter_coeffs.as_ptr(),
+            state.as_mut_ptr(),
             block_size,
         );
+    }
+}
+
+/// Wrapper for CMSIS-DSP function `arm_fir_decimate_f32` using Rust types.
+pub fn fir_decimate_f32(
+    s: &mut sys::arm_fir_decimate_instance_f32,
+    input: &[f32],
+    output: &mut [f32],
+    block_size: u32,
+) {
+    // void arm_fir_decimate_f32 	( 	const arm_fir_decimate_instance_f32 *  	S,
+    // 		const float32_t *  	pSrc,
+    // 		float32_t *  	pDst,
+    // 		uint32_t  	blockSize
+    // 	)
+    //
+    // [in]	S	points to an instance of the floating-point FIR decimator structure
+    // [in]	pSrc	points to the block of input data
+    // [out]	pDst	points to the block of output data
+    // [in]	blockSize	number of samples to process
+    // Returns none
+
+    compiler_fence(Ordering::SeqCst);
+    unsafe {
+        sys::arm_fir_decimate_f32(s, input.as_ptr(), output.as_mut_ptr(), block_size);
     }
 }
 
@@ -240,12 +291,7 @@ pub fn biquad_cascade_df1_f32(
 ) {
     compiler_fence(Ordering::SeqCst);
     unsafe {
-        sys::arm_biquad_cascade_df1_f32(
-            s,
-            input.as_ptr(),
-            output.as_mut_ptr(),
-            block_size,
-        );
+        sys::arm_biquad_cascade_df1_f32(s, input.as_ptr(), output.as_mut_ptr(), block_size);
     }
 }
 
@@ -301,14 +347,8 @@ pub fn biquad_cascade_df2T_f32(
     output: &mut [f32],
     block_size: u32,
 ) {
-
     compiler_fence(Ordering::SeqCst);
     unsafe {
-        sys::arm_biquad_cascade_df2T_f32(
-            s,
-            input.as_ptr(),
-            output.as_mut_ptr(),
-            block_size,
-        );
+        sys::arm_biquad_cascade_df2T_f32(s, input.as_ptr(), output.as_mut_ptr(), block_size);
     }
 }
