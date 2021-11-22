@@ -213,6 +213,13 @@ pub fn fir_decimate_init_f32(
 }
 
 /// Wrapper for CMSIS-DSP function `arm_fir_decimate_f32` using Rust types.
+/// The FIR decimator functions provided in the CMSIS DSP Library combine the FIR filter
+/// and the decimator in an efficient manner. Instead of calculating all of the FIR filter
+/// outputs and discarding M-1 out of every M, only the samples output by the decimator are
+/// computed. The functions operate on blocks of input and output data. pSrc points to an array
+/// of blockSize input values and pDst points to an array of blockSize/M output values.
+/// In order to have an integer number of output samples blockSize must always be a multiple
+/// of the decimation factor M.
 pub fn fir_decimate_f32(
     s: &mut sys::arm_fir_decimate_instance_f32,
     input: &[f32],
@@ -350,5 +357,47 @@ pub fn biquad_cascade_df2T_f32(
     compiler_fence(Ordering::SeqCst);
     unsafe {
         sys::arm_biquad_cascade_df2T_f32(s, input.as_ptr(), output.as_mut_ptr(), block_size);
+    }
+}
+
+/// Wrapper for CMSIS-DSP function `arm_rfft_fast_init_f32`.
+/// https://www.keil.com/pack/doc/CMSIS/DSP/html/group__RealFFT.html#gac5fceb172551e7c11eb4d0e17ef15aa3
+pub fn rfft_fast_init_f32(s: &mut sys::arm_rfft_fast_instance_f32, fft_len: u16) {
+    // Parameters
+    //     [in,out]	S	points to an arm_rfft_fast_instance_f32 structure
+    //     [in]	fftLen	length of the Real Sequence
+
+    compiler_fence(Ordering::SeqCst);
+    unsafe {
+        sys::arm_rfft_fast_init_f32(s, fft_len);
+    }
+}
+
+/// Wrapper for CMSIS-DSP function `arm_rfft_fast_f32`.
+/// https://www.keil.com/pack/doc/CMSIS/DSP/html/group__RealFFT.html#ga5d2ec62f3e35575eba467d09ddcd98b5
+/// Note: The input buffer is modified by this function, as documented here.
+pub fn rfft_fast_f32(
+    s: &mut sys::arm_rfft_fast_instance_f32,
+    input: &mut [f32],
+    output: &mut [f32],
+    ifft: bool,
+) {
+    // Parameters
+    //     [in]	S	points to an arm_rfft_fast_instance_f32 structure
+    //     [in]	p	points to input buffer (Source buffer is modified by this function.)
+    //     [in]	pOut	points to output buffer
+    //     [in]	ifftFlag
+    //
+    //         value = 0: RFFT
+    //         value = 1: RIFFT
+
+    compiler_fence(Ordering::SeqCst);
+    unsafe {
+        sys::arm_rfft_fast_f32(
+            s,
+            input.as_mut_ptr(),
+            output.as_mut_ptr(),
+            if ifft == true { 1 } else { 0 },
+        );
     }
 }
