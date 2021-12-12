@@ -13,7 +13,10 @@
 //! Only wraps functions that map to C pointers; these are the ones that need an API improvement.
 //! For ones that don't (Eg arm_sin_), use the wrapped CMSIS library directly.
 
-use core::sync::atomic::{compiler_fence, Ordering};
+use core::{
+    mem::MaybeUninit,
+    sync::atomic::{compiler_fence, Ordering},
+};
 
 use cmsis_dsp_sys as sys;
 
@@ -64,6 +67,19 @@ pub fn fir_init_q31(
             state.as_mut_ptr(),
             block_size,
         );
+    }
+}
+
+/// Initialize an empty instance of `arm_fir_instance_q31`. Used for setting up static types.
+/// See https://www.keil.com/pack/doc/CMSIS/DSP/html/structarm__fir__decimate__instance__f32.html
+/// The CMSIS-DSP C-API requires us to initialize, eg with 0s.
+pub fn fir_init_empty_q31() -> sys::arm_fir_instance_q31 {
+    let mut uninit_ptr = MaybeUninit::uninit();
+
+    sys::arm_fir_instance_q31 {
+        numTaps: 0,
+        pCoeffs: uninit_ptr.as_ptr(),
+        pState: uninit_ptr.as_mut_ptr(),
     }
 }
 
@@ -145,6 +161,17 @@ pub fn fir_init_f32(
     }
 }
 
+/// Initialize an empty instance of `arm_fir_instance_f32`. Used for setting up static types.
+pub fn fir_init_empty_f32() -> sys::arm_fir_instance_f32 {
+    let mut uninit_ptr = MaybeUninit::uninit();
+
+    sys::arm_fir_instance_f32 {
+        numTaps: 0,
+        pCoeffs: uninit_ptr.as_ptr(),
+        pState: uninit_ptr.as_mut_ptr(),
+    }
+}
+
 /// Wrapper for CMSIS-DSP function `arm_fir_f32` using Rust types.
 /// [arm_fir_f32 docs](https://www.keil.com/pack/doc/CMSIS/DSP/html/group__FIR.html#ga0cf008f650a75f5e2cf82d10691b64d9)
 /// See https://www.keil.com/pack/doc/CMSIS/DSP/html/group__FIRLPF.html
@@ -212,6 +239,18 @@ pub fn fir_decimate_init_f32(
     }
 }
 
+/// Initialize an empty instance of `arm_fir_decimate_instance_f32`. Used for setting up static types.
+pub fn fir_decimate_init_empty_f32() -> sys::arm_fir_decimate_instance_f32 {
+    let mut uninit_ptr = MaybeUninit::uninit();
+
+    sys::arm_fir_decimate_instance_f32 {
+        M: 0,
+        numTaps: 0,
+        pCoeffs: uninit_ptr.as_ptr(),
+        pState: uninit_ptr.as_mut_ptr(),
+    }
+}
+
 /// Wrapper for CMSIS-DSP function `arm_fir_decimate_f32` using Rust types.
 /// The FIR decimator functions provided in the CMSIS DSP Library combine the FIR filter
 /// and the decimator in an efficient manner. Instead of calculating all of the FIR filter
@@ -244,6 +283,64 @@ pub fn fir_decimate_f32(
     }
 }
 
+/// Wrapper for CMSIS-DSP function `arm_biquad_cascade_df1_init_q31`.
+pub fn biquad_cascade_df1_init_q31(
+    s: &mut sys::arm_biquad_casd_df1_inst_q31,
+    filter_coeffs: &[i32],
+    state: &mut [i32],
+    post_shift: i8,
+) {
+    let num_stages = filter_coeffs.len() / 5;
+
+    // The 4 state variables for stage 1 are first, then the 4 state variables for stage 2, and so on.
+    // The state array has a total length of 4*numStages values.
+    assert!(state.len() == 4 * num_stages);
+
+    // See notes for f32 variant.
+    // Parameters
+    //     [in,out]	S	points to an instance of the Q31 Biquad cascade structure.
+    //     [in]	numStages	number of 2nd order stages in the filter.
+    //     [in]	pCoeffs	points to the filter coefficients.
+    //     [in]	pState	points to the state buffer.
+    //     [in]	postShift	Shift to be applied after the accumulator. Varies according to the coefficients format
+
+    compiler_fence(Ordering::SeqCst);
+    unsafe {
+        sys::arm_biquad_cascade_df1_init_q31(
+            s,
+            num_stages as u8,
+            filter_coeffs.as_ptr(),
+            state.as_mut_ptr(),
+            post_shift,
+        );
+    }
+}
+
+/// Initialize an empty instance of `arm_biquad_casd_df1_inst_q31`. Used for setting up static types.
+pub fn biquad_cascade_init_empty_q31() -> sys::arm_biquad_casd_df1_inst_q31 {
+    let mut uninit_ptr = MaybeUninit::uninit();
+
+    sys::arm_biquad_casd_df1_inst_q31 {
+        numStages: 0,
+        pCoeffs: uninit_ptr.as_ptr(),
+        pState: uninit_ptr.as_mut_ptr(),
+        postShift: 0,
+    }
+}
+
+/// Wrapper for CMSIS-DSP function `arm_biquad_cascade_df1_q31`.
+pub fn biquad_cascade_df1_q31(
+    s: &mut sys::arm_biquad_casd_df1_inst_q31,
+    input: &[i32],
+    output: &mut [i32],
+    block_size: u32,
+) {
+    compiler_fence(Ordering::SeqCst);
+    unsafe {
+        sys::arm_biquad_cascade_df1_q31(s, input.as_ptr(), output.as_mut_ptr(), block_size);
+    }
+}
+
 /// Wrapper for CMSIS-DSP function `arm_biquad_cascade_df1_init_f32`.
 pub fn biquad_cascade_df1_init_f32(
     s: &mut sys::arm_biquad_casd_df1_inst_f32,
@@ -255,12 +352,6 @@ pub fn biquad_cascade_df1_init_f32(
     // The 4 state variables for stage 1 are first, then the 4 state variables for stage 2, and so on.
     // The state array has a total length of 4*numStages values.
     assert!(state.len() == 4 * num_stages);
-
-    // let mut s = sys::arm_biquad_casd_df1_inst_f32 {
-    //     numStages: num_stages,
-    //     pCoeffs: filter_coeffs.as_ptr(),
-    //     pState: state.as_mut_ptr(),
-    // };
 
     //     The coefficients are stored in the array pCoeffs in the following order:
     //
@@ -286,6 +377,17 @@ pub fn biquad_cascade_df1_init_f32(
             filter_coeffs.as_ptr(),
             state.as_mut_ptr(),
         );
+    }
+}
+
+/// Initialize an empty instance of `arm_biquad_casd_df1_inst_f32`. Used for setting up static types.
+pub fn biquad_cascade_df1_init_empty_f32() -> sys::arm_biquad_casd_df1_inst_f32 {
+    let mut uninit_ptr = MaybeUninit::uninit();
+
+    sys::arm_biquad_casd_df1_inst_f32 {
+        numStages: 0,
+        pCoeffs: uninit_ptr.as_ptr(),
+        pState: uninit_ptr.as_mut_ptr(),
     }
 }
 
