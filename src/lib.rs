@@ -29,7 +29,7 @@ pub fn fir_init_q31(
     s: &mut sys::arm_fir_instance_q31,
     filter_coeffs: &[i32],
     state: &mut [i32],
-    block_size: u32,
+    block_size: usize,
 ) {
     let num_taps = filter_coeffs.len();
     // pState points to the array of state variables. pState is of length numTaps+blockSize-1 samples
@@ -65,7 +65,7 @@ pub fn fir_init_q31(
             num_taps as u16,
             filter_coeffs.as_ptr(),
             state.as_mut_ptr(),
-            block_size,
+            block_size as u32,
         );
     }
 }
@@ -94,7 +94,7 @@ pub fn fir_q31(
     s: &mut sys::arm_fir_instance_q31,
     input: &[i32],
     output: &mut [i32],
-    block_size: u32,
+    block_size: usize,
 ) {
     // void arm_fir_q31 	(
     //     const arm_fir_instance_q31 *  	S,
@@ -111,7 +111,7 @@ pub fn fir_q31(
 
     compiler_fence(Ordering::SeqCst);
     unsafe {
-        sys::arm_fir_q31(s, input.as_ptr(), output.as_mut_ptr(), block_size);
+        sys::arm_fir_q31(s, input.as_ptr(), output.as_mut_ptr(), block_size as u32);
     }
 }
 
@@ -120,12 +120,12 @@ pub fn fir_init_f32(
     s: &mut sys::arm_fir_instance_f32,
     filter_coeffs: &[f32],
     state: &mut [f32],
-    block_size: u32,
+    block_size: usize,
 ) {
     let num_taps = filter_coeffs.len();
     // pState points to the array of state variables. pState is of length numTaps+blockSize-1 samples
     // where blockSize is the number of input samples processed by each call to arm_fir_f32().
-    assert_eq!(state.len(), num_taps + block_size as usize - 1);
+    assert_eq!(state.len(), num_taps + block_size - 1);
 
     // https://www.keil.com/pack/doc/CMSIS/DSP/html/structarm__fir__instance__f32.html
     // Data Fields:
@@ -156,7 +156,7 @@ pub fn fir_init_f32(
             num_taps as u16,
             filter_coeffs.as_ptr(),
             state.as_mut_ptr(),
-            block_size,
+            block_size as u32,
         );
     }
 }
@@ -183,7 +183,7 @@ pub fn fir_f32(
     s: &mut sys::arm_fir_instance_f32,
     input: &[f32],
     output: &mut [f32],
-    block_size: u32,
+    block_size: usize,
 ) {
     // void arm_fir_f32 	(
     //     const arm_fir_instance_f32 *  	S,
@@ -199,7 +199,7 @@ pub fn fir_f32(
     // Returns none
     compiler_fence(Ordering::SeqCst);
     unsafe {
-        sys::arm_fir_f32(s, input.as_ptr(), output.as_mut_ptr(), block_size);
+        sys::arm_fir_f32(s, input.as_ptr(), output.as_mut_ptr(), block_size as u32);
     }
 }
 
@@ -209,12 +209,12 @@ pub fn fir_decimate_init_f32(
     decimation_factor: u8,
     filter_coeffs: &[f32],
     state: &mut [f32],
-    block_size: u32,
+    block_size: usize,
 ) {
     let num_taps = filter_coeffs.len();
     // pState points to the array of state variables. pState is of length numTaps+blockSize-1 samples
     // where blockSize is the number of input samples processed by each call to arm_fir_f32().
-    assert_eq!(state.len(), num_taps + block_size as usize - 1);
+    assert_eq!(state.len(), num_taps + block_size - 1);
 
     // https://www.keil.com/pack/doc/CMSIS/DSP/html/group__FIR__decimate.html#ga67c80582fc296552fef2bd1f208d853b
     // Parameters:
@@ -234,7 +234,7 @@ pub fn fir_decimate_init_f32(
             decimation_factor,
             filter_coeffs.as_ptr(),
             state.as_mut_ptr(),
-            block_size,
+            block_size as u32,
         );
     }
 }
@@ -263,7 +263,7 @@ pub fn fir_decimate_f32(
     s: &mut sys::arm_fir_decimate_instance_f32,
     input: &[f32],
     output: &mut [f32],
-    block_size: u32,
+    block_size: usize,
 ) {
     // void arm_fir_decimate_f32 	( 	const arm_fir_decimate_instance_f32 *  	S,
     // 		const float32_t *  	pSrc,
@@ -279,7 +279,7 @@ pub fn fir_decimate_f32(
 
     compiler_fence(Ordering::SeqCst);
     unsafe {
-        sys::arm_fir_decimate_f32(s, input.as_ptr(), output.as_mut_ptr(), block_size);
+        sys::arm_fir_decimate_f32(s, input.as_ptr(), output.as_mut_ptr(), block_size as u32);
     }
 }
 
@@ -317,7 +317,7 @@ pub fn biquad_cascade_df1_init_q31(
 }
 
 /// Initialize an empty instance of `arm_biquad_casd_df1_inst_q31`. Used for setting up static types.
-pub fn biquad_cascade_init_empty_q31() -> sys::arm_biquad_casd_df1_inst_q31 {
+pub fn biquad_cascade_df1_init_empty_q31() -> sys::arm_biquad_casd_df1_inst_q31 {
     let mut uninit_ptr = MaybeUninit::uninit();
 
     sys::arm_biquad_casd_df1_inst_q31 {
@@ -501,5 +501,45 @@ pub fn rfft_fast_f32(
             output.as_mut_ptr(),
             if ifft == true { 1 } else { 0 },
         );
+    }
+}
+
+/// Wrapper for CMSIS-DSP function `arm_correlate_f32`.
+/// https://www.keil.com/pack/doc/CMSIS/DSP/html/group__Corr.html#ga371054f6e5fd78bec668908251f1b2f2
+pub fn correlate_f32(
+    src_a: &[f32],
+    src_a_len: usize,
+    src_b: &[f32],
+    src_b_len: usize,
+    p_dist: &mut [f32],
+) {
+    // Parameters
+    //     [in]	pSrcA	points to the first input sequence
+    //     [in]	srcALen	length of the first input sequence
+    //     [in]	pSrcB	points to the second input sequence
+    //     [in]	srcBLen	length of the second input sequence
+    //     [out]	pDst	points to the location where the output result is written. Length 2 * max(srcALen, srcBLen) - 1.
+    //
+    // Returns
+    //     none
+
+    compiler_fence(Ordering::SeqCst);
+    unsafe {
+        sys::arm_correlate_f32(
+            src_a.as_ptr(),
+            src_a_len as u32,
+            src_b.as_ptr(),
+            src_b_len as u32,
+            p_dist.as_mut_ptr(),
+        );
+    }
+}
+
+/// Wrapper for CMSIS-DSP function `arm_correlation_distance_f32`.
+/// https://www.keil.com/pack/doc/CMSIS/DSP/html/group__Correlation.html#gaf51cef11ade667912bb004cb24dc4e39
+pub fn correlation_distance_f32(p_a: &[f32], p_b: &[f32], block_size: usize) {
+    compiler_fence(Ordering::SeqCst);
+    unsafe {
+        sys::arm_correlation_distance_f32(p_a.as_ptr(), p_b.as_ptr(), block_size as u32);
     }
 }
