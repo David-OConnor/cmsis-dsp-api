@@ -283,6 +283,102 @@ pub fn fir_decimate_f32(
     }
 }
 
+/// Wrapper for CMSIS-DSP function `arm_fir_interpolate_init_f32`.
+/// `block_size` is the number if input samples processed. (Not output).
+pub fn fir_interpolate_init_f32(
+    s: &mut sys::arm_fir_interpolate_instance_f32,
+    upsample_factor: u8,
+    filter_coeffs: &[f32],
+    state: &mut [f32],
+    block_size: usize,
+) {
+    let num_taps = filter_coeffs.len();
+    // pState points to the array of state variables. pState is of length (numTaps/L)+blockSize-1 words
+    // where blockSize is the number of input samples processed by each call to arm_fir_interpolate_f32().
+    assert_eq!(
+        state.len(),
+        num_taps / upsample_factor as usize + block_size - 1
+    );
+
+    // https://www.keil.com/pack/doc/CMSIS/DSP/html/group__FIR__Interpolate.html#ga1416bcc1bcf6e2b18ff15261b6e04345
+    // arm_status arm_fir_interpolate_init_f32 	( 	arm_fir_interpolate_instance_f32 *  	S,
+    // 		uint8_t  	L,
+    // 		uint16_t  	numTaps,
+    // 		const float32_t *  	pCoeffs,
+    // 		float32_t *  	pState,
+    // 		uint32_t  	blockSize
+    // 	)
+    //
+    // Parameters
+    //     [in,out]	S	points to an instance of the floating-point FIR interpolator structure
+    //     [in]	L	upsample factor
+    //     [in]	numTaps	number of filter coefficients in the filter
+    //     [in]	pCoeffs	points to the filter coefficient buffer
+    //     [in]	pState	points to the state buffer
+    //     [in]	blockSize	number of input samples to process per call
+    //
+    // Returns
+    //     execution status
+    //
+    //         ARM_MATH_SUCCESS : Operation successful
+    //         ARM_MATH_ARGUMENT_ERROR : filter length numTaps is not a multiple of the interpolation factor L
+
+    compiler_fence(Ordering::SeqCst);
+    unsafe {
+        sys::arm_fir_interpolate_init_f32(
+            s,
+            upsample_factor,
+            num_taps as u16,
+            filter_coeffs.as_ptr(),
+            state.as_mut_ptr(),
+            block_size as u32,
+        );
+    }
+}
+
+/// Initialize an empty instance of `arm_fir_interpolate_instance_f32`. Used for setting up static types.
+pub fn fir_interpolate_init_empty_f32() -> sys::arm_fir_interpolate_instance_f32 {
+    let mut uninit_ptr = MaybeUninit::uninit();
+
+    sys::arm_fir_interpolate_instance_f32 {
+        L: 0,
+        phaseLength: 0,
+        pCoeffs: uninit_ptr.as_ptr(),
+        pState: uninit_ptr.as_mut_ptr(),
+    }
+}
+
+/// Wrapper for CMSIS-DSP function `arm_interplate_f32`.
+/// https://www.keil.com/pack/doc/CMSIS/DSP/html/group__FIR__Interpolate.html
+pub fn fir_interpolate_f32(
+    s: &mut sys::arm_fir_interpolate_instance_f32,
+    input: &[f32],
+    output: &mut [f32],
+    block_size: usize,
+) {
+    // void arm_fir_interpolate_f32 	( 	const arm_fir_interpolate_instance_f32 *  	S,
+    // 		const float32_t *  	pSrc,
+    // 		float32_t *  	pDst,
+    // 		uint32_t  	blockSize
+    // 	)
+
+    // Processing function for the floating-point FIR interpolator.
+    //
+    // Parameters
+    //     [in]	S	points to an instance of the floating-point FIR interpolator structure
+    //     [in]	pSrc	points to the block of input data
+    //     [out]	pDst	points to the block of output data
+    //     [in]	blockSize	number of samples to process
+    //
+    // Returns
+    //     none
+
+    compiler_fence(Ordering::SeqCst);
+    unsafe {
+        sys::arm_fir_interpolate_f32(s, input.as_ptr(), output.as_mut_ptr(), block_size as u32);
+    }
+}
+
 /// Wrapper for CMSIS-DSP function `arm_biquad_cascade_df1_init_q31`.
 pub fn biquad_cascade_df1_init_q31(
     s: &mut sys::arm_biquad_casd_df1_inst_q31,
@@ -537,9 +633,9 @@ pub fn correlate_f32(
 
 /// Wrapper for CMSIS-DSP function `arm_correlation_distance_f32`.
 /// https://www.keil.com/pack/doc/CMSIS/DSP/html/group__Correlation.html#gaf51cef11ade667912bb004cb24dc4e39
-pub fn correlation_distance_f32(p_a: &[f32], p_b: &[f32], block_size: usize) {
+pub fn correlation_distance_f32(p_a: &mut [f32], p_b: &mut [f32], block_size: usize) -> f32 {
     compiler_fence(Ordering::SeqCst);
     unsafe {
-        sys::arm_correlation_distance_f32(p_a.as_ptr(), p_b.as_ptr(), block_size as u32);
+        sys::arm_correlation_distance_f32(p_a.as_mut_ptr(), p_b.as_mut_ptr(), block_size as u32)
     }
 }
