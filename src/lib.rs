@@ -13,6 +13,9 @@
 //! Only wraps functions that map to C pointers; these are the ones that need an API improvement.
 //! For ones that don't (Eg arm_sin_), use the wrapped CMSIS library directly.
 
+// todo: Consider having wrapper structs that impl Send (for use with RTIC etc),
+// todo, and own their state and coefficient buffers!
+
 use core::{
     mem::MaybeUninit,
     sync::atomic::{compiler_fence, Ordering},
@@ -27,8 +30,8 @@ use cmsis_dsp_sys as sys;
 /// Wrapper for CMSIS-DSP function `arm_fir_init_q31`.
 pub fn fir_init_q31(
     s: &mut sys::arm_fir_instance_q31,
-    filter_coeffs: &[i32],
-    state: &mut [i32],
+    filter_coeffs: &'static [i32],
+    state: &'static mut [i32],
     block_size: usize,
 ) {
     let num_taps = filter_coeffs.len();
@@ -118,8 +121,8 @@ pub fn fir_q31(
 /// Wrapper for CMSIS-DSP function `arm_fir_init_f32`.
 pub fn fir_init_f32(
     s: &mut sys::arm_fir_instance_f32,
-    filter_coeffs: &[f32],
-    state: &mut [f32],
+    filter_coeffs: &'static [f32],
+    state: &'static mut [f32],
     block_size: usize,
 ) {
     let num_taps = filter_coeffs.len();
@@ -202,13 +205,52 @@ pub fn fir_f32(
         sys::arm_fir_f32(s, input.as_ptr(), output.as_mut_ptr(), block_size as u32);
     }
 }
+//
+// /// Used to satisfy RTIC resource Send requirements. Owns its state and buffer, so you don't
+// /// have to use statics.
+// pub struct FirInstF32 {
+//     pub inst: sys::arm_fir_instance_f32,
+//     pub coeffs: &'static [f32],
+//     pub state: &'static mut [f32],
+// }
+//
+// unsafe impl Send for FirF32Inst {}
+//
+// impl FirInstF32 {
+//     pub fn new(coeffs: &'static [f32], state: &'static mut [f32], block_size: usize) -> Self {
+//         let mut inst = fir_init_empty_f32();
+//         Self {
+//             inst: fir_init_f32(&mut inst, coeffs, state, block_size);
+//             coeffs,
+//             state,
+//         }
+//     }
+// }
+//
+// /// Used to satisfy RTIC resource Send requirements. Owns its state and buffer, so you don't
+// /// have to use statics.
+// pub struct IirInstF32 {
+//     pub inst: sys::arm_biquad_casd_df1_inst_f32,
+//     pub coeffs: &'static [f32],
+//     pub state: &'static mut [f32],
+// }
+//
+// unsafe impl Send for IirF32Inst {}
+
+// impl FirInstF32 {
+//     pub fn new() -> Self {
+//         Self {
+//             inst: fir_in_f32(),
+//         }
+//     }
+// }
 
 /// Wrapper for CMSIS-DSP function `arm_fir_decimate_init_f32`.
 pub fn fir_decimate_init_f32(
     s: &mut sys::arm_fir_decimate_instance_f32,
     decimation_factor: u8,
-    filter_coeffs: &[f32],
-    state: &mut [f32],
+    filter_coeffs: &'static [f32],
+    state: &'static mut [f32],
     block_size: usize,
 ) {
     let num_taps = filter_coeffs.len();
@@ -288,8 +330,8 @@ pub fn fir_decimate_f32(
 pub fn fir_interpolate_init_f32(
     s: &mut sys::arm_fir_interpolate_instance_f32,
     upsample_factor: u8,
-    filter_coeffs: &[f32],
-    state: &mut [f32],
+    filter_coeffs: &'static [f32],
+    state: &'static mut [f32],
     block_size: usize,
 ) {
     let num_taps = filter_coeffs.len();
@@ -382,8 +424,8 @@ pub fn fir_interpolate_f32(
 /// Wrapper for CMSIS-DSP function `arm_biquad_cascade_df1_init_q31`.
 pub fn biquad_cascade_df1_init_q31(
     s: &mut sys::arm_biquad_casd_df1_inst_q31,
-    filter_coeffs: &[i32],
-    state: &mut [i32],
+    filter_coeffs: &'static [i32],
+    state: &'static mut [i32],
     post_shift: i8,
 ) {
     let num_stages = filter_coeffs.len() / 5;
@@ -440,8 +482,8 @@ pub fn biquad_cascade_df1_q31(
 /// Wrapper for CMSIS-DSP function `arm_biquad_cascade_df1_init_f32`.
 pub fn biquad_cascade_df1_init_f32(
     s: &mut sys::arm_biquad_casd_df1_inst_f32,
-    filter_coeffs: &[f32],
-    state: &mut [f32],
+    filter_coeffs: &'static [f32],
+    state: &'static mut [f32],
 ) {
     let num_stages = filter_coeffs.len() / 5;
 
@@ -503,8 +545,8 @@ pub fn biquad_cascade_df1_f32(
 /// Wrapper for CMSIS-DSP function `arm_biquad_cascade_df2T_init_f32`.
 pub fn biquad_cascade_df2T_init_f32(
     s: &mut sys::arm_biquad_cascade_df2T_instance_f32,
-    filter_coeffs: &[f32],
-    state: &mut [f32],
+    filter_coeffs: &'static [f32],
+    state: &'static mut [f32],
 ) {
     let num_stages = filter_coeffs.len() / 5;
 
