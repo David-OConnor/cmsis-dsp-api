@@ -421,6 +421,64 @@ pub fn fir_interpolate_f32(
     }
 }
 
+/// Wrapper for CMSIS-DSP function `arm_biquad_cascade_df1_init_q15`.
+pub fn biquad_cascade_df1_init_q15(
+    s: &mut sys::arm_biquad_casd_df1_inst_q15,
+    filter_coeffs: &'static [i16],
+    state: &'static mut [i16],
+    post_shift: i8,
+) {
+    let num_stages = filter_coeffs.len() / 5;
+
+    // The 4 state variables for stage 1 are first, then the 4 state variables for stage 2, and so on.
+    // The state array has a total length of 4*numStages values.
+    assert!(state.len() == 4 * num_stages);
+
+    // See notes for f32 variant.
+    // Parameters
+    //     [in,out]	S	points to an instance of the Q31 Biquad cascade structure.
+    //     [in]	numStages	number of 2nd order stages in the filter.
+    //     [in]	pCoeffs	points to the filter coefficients.
+    //     [in]	pState	points to the state buffer.
+    //     [in]	postShift	Shift to be applied after the accumulator. Varies according to the coefficients format
+
+    compiler_fence(Ordering::SeqCst);
+    unsafe {
+        sys::arm_biquad_cascade_df1_init_q15(
+            s,
+            num_stages as u8,
+            filter_coeffs.as_ptr(),
+            state.as_mut_ptr(),
+            post_shift,
+        );
+    }
+}
+
+/// Initialize an empty instance of `arm_biquad_casd_df1_inst_q31`. Used for setting up static types.
+pub fn biquad_cascade_df1_init_empty_q15() -> sys::arm_biquad_casd_df1_inst_q15 {
+    let mut uninit_ptr = MaybeUninit::uninit();
+
+    sys::arm_biquad_casd_df1_inst_q15 {
+        numStages: 0,
+        pCoeffs: uninit_ptr.as_ptr(),
+        pState: uninit_ptr.as_mut_ptr(),
+        postShift: 0,
+    }
+}
+
+/// Wrapper for CMSIS-DSP function `arm_biquad_cascade_df1_q15`.
+pub fn biquad_cascade_df1_q15(
+    s: &mut sys::arm_biquad_casd_df1_inst_q15,
+    input: &[i16],
+    output: &mut [i16],
+    block_size: u32,
+) {
+    compiler_fence(Ordering::SeqCst);
+    unsafe {
+        sys::arm_biquad_cascade_df1_q15(s, input.as_ptr(), output.as_mut_ptr(), block_size);
+    }
+}
+
 /// Wrapper for CMSIS-DSP function `arm_biquad_cascade_df1_init_q31`.
 pub fn biquad_cascade_df1_init_q31(
     s: &mut sys::arm_biquad_casd_df1_inst_q31,
