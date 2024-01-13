@@ -739,3 +739,10 @@ pub fn correlation_distance_f32(p_a: &mut [f32], p_b: &mut [f32], block_size: us
         sys::arm_correlation_distance_f32(p_a.as_mut_ptr(), p_b.as_mut_ptr(), block_size as u32)
     }
 }
+
+/// Helper fn to reduce repetition. Applies an f32 IIR filter to a single value.
+pub fn iir_one(filter: &mut sys::arm_biquad_casd_df1_inst_f32, value: f32) -> f32 {
+    let mut out_buf = [0.];
+    biquad_cascade_df1_f32(filter, &[value], &mut out_buf, 1);
+    out_buf[0]
+}
