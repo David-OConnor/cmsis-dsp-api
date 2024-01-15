@@ -9,7 +9,8 @@ description = "High-level access to CMSIS, using the `cmsis-dsp` crate"
 # CMSIS-DSP, for FFTs, FIR etc. C lib wrapped with FFI.
 # Trouble with LIBCLANG. See this: https://github.com/rust-lang/rust-bindgen/blob/master/book/src/requirements.md
 #cmsis-dsp-sys = "^0.3.1"
-cmsis-dsp-sys = { git = "https://github.com/David-OConnor/cmsis-dsp-sys" }
+#cmsis-dsp-sys = { git = "https://github.com/David-OConnor/cmsis-dsp-sys" }
+cmsis-dsp-sys = "^0.3.1"
 
 # We may need a math lib like libm later. See note on cmsis-dsp-sys readme.
 # libm = "0.2.1"
