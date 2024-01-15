@@ -750,7 +750,7 @@ pub fn iir_apply(filter: &mut sys::arm_biquad_casd_df1_inst_f32, value: f32) -> 
 }
 
 /// Helper fn to reduce repetition. Creates an f32 IIR filter with 1 tap.
-pub fn iir_new(coeffs: &[u8], state: &mut [u8]) -> sys::arm_biquad_casd_df1_inst_f32 {
+pub fn iir_new(coeffs: &'static [f32], state: &'static mut [f32]) -> sys::arm_biquad_casd_df1_inst_f32 {
     let mut result = biquad_cascade_df1_init_empty_f32();
 
     biquad_cascade_df1_init_f32(
