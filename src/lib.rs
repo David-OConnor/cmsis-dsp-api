@@ -18,7 +18,7 @@
 
 use core::{
     mem::MaybeUninit,
-    sync::atomic::{compiler_fence, Ordering},
+    sync::atomic::{Ordering, compiler_fence},
 };
 
 use cmsis_dsp_sys as sys;
@@ -740,8 +740,6 @@ pub fn correlation_distance_f32(p_a: &mut [f32], p_b: &mut [f32], block_size: us
     }
 }
 
-
-
 /// Helper fn to reduce repetition. Applies an f32 IIR filter to a single value.
 pub fn iir_apply(filter: &mut sys::arm_biquad_casd_df1_inst_f32, value: f32) -> f32 {
     let mut out_buf = [0.];
@@ -750,13 +748,12 @@ pub fn iir_apply(filter: &mut sys::arm_biquad_casd_df1_inst_f32, value: f32) -> 
 }
 
 /// Helper fn to reduce repetition. Creates an f32 IIR filter with 1 tap.
-pub fn iir_new(coeffs: &'static [f32], state: &'static mut [f32]) -> sys::arm_biquad_casd_df1_inst_f32 {
+pub fn iir_new(
+    coeffs: &'static [f32],
+    state: &'static mut [f32],
+) -> sys::arm_biquad_casd_df1_inst_f32 {
     let mut result = biquad_cascade_df1_init_empty_f32();
 
-    biquad_cascade_df1_init_f32(
-        &mut result,
-        coeffs,
-        state
-    );
+    biquad_cascade_df1_init_f32(&mut result, coeffs, state);
     result
 }
